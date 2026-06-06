@@ -1,0 +1,6 @@
+,seed,seed,outcome_prevalence,outcome_prevalence,bayes_brier,bayes_brier,model_brier,model_brier,ece,ece,auroc,auroc
+,mean,std,mean,std,mean,std,mean,std,mean,std,mean,std
+scenario,,,,,,,,,,,,
+concept_shift_only_no_feature_shift,9.5,5.916,0.477,0.004,0.12,0.001,0.223,0.005,0.135,0.007,0.756,0.009
+main,9.5,5.916,0.762,0.006,0.092,0.001,0.219,0.007,0.228,0.009,0.766,0.013
+prevalence_matched_novel,9.5,5.916,0.349,0.007,0.111,0.001,0.229,0.005,0.186,0.01,0.757,0.011

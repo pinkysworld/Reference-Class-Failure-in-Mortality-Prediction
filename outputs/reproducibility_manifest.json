@@ -1,0 +1,55 @@
+{
+  "seeds": 20,
+  "features": [
+    "age",
+    "comorbidity_burden",
+    "organ_dysfunction_score",
+    "treatment_intensity",
+    "inflammatory_burden",
+    "frailty"
+  ],
+  "beta_ref": [
+    0.7,
+    0.6,
+    0.95,
+    -0.5,
+    0.55,
+    0.85
+  ],
+  "beta_novel": [
+    0.2,
+    0.55,
+    1.7,
+    1.25,
+    0.95,
+    1.55
+  ],
+  "mu_novel": [
+    0.3,
+    0.25,
+    0.45,
+    0.4,
+    0.3,
+    0.55
+  ],
+  "intercept_ref": -0.95,
+  "intercept_novel": -0.2,
+  "train_sizes": [
+    250,
+    500,
+    1000,
+    2000,
+    4000,
+    8000
+  ],
+  "test_size": 6000,
+  "novelty_detection_auroc": 0.5677193541666666,
+  "bayes_brier_reference": 0.15125054956047584,
+  "bayes_brier_novel": 0.09201702125041476,
+  "oracle_brier_novel": 0.09300600433643766,
+  "reference_prevalence": 0.34908333333333336,
+  "novel_prevalence": 0.7633166666666666,
+  "numpy": "2.4.6",
+  "pandas": "3.0.3",
+  "python": "3.12.13"
+}
