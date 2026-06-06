@@ -218,15 +218,51 @@ def sensitivity(seeds):
         Xtr, ytr, _ = gen_regime(8000, "reference", rng)
         gb = HistGradientBoostingClassifier(
             max_depth=3, learning_rate=0.06, max_iter=300, random_state=0).fit(Xtr, ytr)
+        cov_est = EmpiricalCovariance().fit(Xtr)
+        Xref_test, _, _ = gen_regime(N_TEST, "reference", rng)
         for name, c in scenarios.items():
             Xte, yte, pte = gen(N_TEST, c["mu"], c["beta"], c["b0"], rng)
             pr = gb.predict_proba(Xte)[:, 1]
+            novelty_scores = np.r_[cov_est.mahalanobis(Xref_test),
+                                   cov_est.mahalanobis(Xte)]
+            novelty_labels = np.r_[np.zeros(N_TEST), np.ones(N_TEST)]
             rows.append(dict(scenario=name, seed=rep,
                              outcome_prevalence=float(yte.mean()),
                              bayes_brier=float(np.mean(pte * (1 - pte))),
                              model_brier=float(brier_score_loss(yte, pr)),
                              ece=ece(yte, pr),
-                             auroc=float(roc_auc_score(yte, pr))))
+                             auroc=float(roc_auc_score(yte, pr)),
+                             novelty_auroc=float(roc_auc_score(novelty_labels, novelty_scores))))
+    return pd.DataFrame(rows)
+
+
+def mixed_accrual(seeds):
+    """Train on fixed-size mixtures of reference and novel cases, then test on novel cases."""
+    rows = []
+    fractions = [0.0, 0.01, 0.02, 0.05, 0.10, 0.20]
+    train_n = 8000
+    for rep in _reps(seeds):
+        rng = default_rng(3000 + rep)
+        Xn_test, yn_test, _ = gen_regime(N_TEST, "novel", rng)
+        for frac in fractions:
+            n_novel = int(round(train_n * frac))
+            n_ref = train_n - n_novel
+            X_parts, y_parts = [], []
+            if n_ref:
+                Xr, yr, _ = gen_regime(n_ref, "reference", rng)
+                X_parts.append(Xr); y_parts.append(yr)
+            if n_novel:
+                Xn, yn, _ = gen_regime(n_novel, "novel", rng)
+                X_parts.append(Xn); y_parts.append(yn)
+            Xtr = np.vstack(X_parts)
+            ytr = np.concatenate(y_parts)
+            idx = rng.permutation(train_n)
+            gb = HistGradientBoostingClassifier(
+                max_depth=3, learning_rate=0.06, max_iter=300, random_state=0).fit(Xtr[idx], ytr[idx])
+            pr = gb.predict_proba(Xn_test)[:, 1]
+            m = metrics(yn_test, pr)
+            rows.append(dict(seed=rep, novel_training_fraction=frac,
+                             novel_training_n=n_novel, **m))
     return pd.DataFrame(rows)
 
 
@@ -247,7 +283,7 @@ def make_figures(df, sel, d_ref, d_nov, ood_auroc, bayes_ref, bayes_nov, seeds, 
         return g.mean(), g.std()
 
     fig, axes = plt.subplots(2, 2, figsize=(10, 7.5), sharex=True)
-    for ax, model in zip(axes.ravel(), MODELS):
+    for label, ax, model in zip(["A", "B", "C", "D"], axes.ravel(), MODELS):
         for regime, c in [("reference", REF_C), ("novel", NOV_C)]:
             m, s = ms(model, regime, "brier")
             ax.plot(m.index, m.values, "-o", color=c, label=regime.capitalize())
@@ -255,13 +291,16 @@ def make_figures(df, sel, d_ref, d_nov, ood_auroc, bayes_ref, bayes_nov, seeds, 
         ax.axhline(bayes_ref, ls=":", color=REF_C, lw=1)
         ax.axhline(bayes_nov, ls=":", color=NOV_C, lw=1)
         ax.set_xscale("log"); ax.set_title(model)
+        ax.text(0.02, 0.97, label, transform=ax.transAxes,
+                fontsize=13, fontweight="bold", va="top", ha="left",
+                bbox=dict(facecolor="white", edgecolor="none", alpha=0.85, pad=1.5))
         ax.set_xlabel("Training sample size (log)"); ax.set_ylabel("Brier score")
     axes[0, 0].legend(frameon=False, title="Test regime", fontsize=9)
     fig.suptitle("Reducible vs. irreducible error: Brier under increasing reference data", y=0.995)
     fig.tight_layout(); fig.savefig(f"{figdir}/figure1_brier_by_training_size.png", bbox_inches="tight"); plt.close(fig)
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.6))
-    for ax, (regime, c) in zip(axes, [("reference", REF_C), ("novel", NOV_C)]):
+    for label, ax, (regime, c) in zip(["A", "B"], axes, [("reference", REF_C), ("novel", NOV_C)]):
         ps, ys = [], []
         for rep in range(seeds):
             rng = default_rng(1000 + rep)
@@ -282,8 +321,11 @@ def make_figures(df, sel, d_ref, d_nov, ood_auroc, bayes_ref, bayes_nov, seeds, 
         ax.plot([0, 1], [0, 1], "k--", lw=1, label="Perfect calibration")
         ax.plot(xs, obs, "-o", color=c, label="Observed")
         ax.set_title(f"{regime.capitalize()} regime"); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+        ax.text(0.02, 0.97, label, transform=ax.transAxes,
+                fontsize=13, fontweight="bold", va="top", ha="left",
+                bbox=dict(facecolor="white", edgecolor="none", alpha=0.85, pad=1.5))
         ax.set_xlabel("Predicted probability"); ax.set_ylabel("Observed mortality")
-        ax.legend(frameon=False, loc="upper left", fontsize=9)
+        ax.legend(frameon=False, loc="lower right", fontsize=9)
     fig.suptitle("Calibration: reliable in-reference, broken on the novel phenotype (gradient boosting)")
     fig.tight_layout(); fig.savefig(f"{figdir}/figure2_reliability_diagram.png", bbox_inches="tight"); plt.close(fig)
 
@@ -296,6 +338,9 @@ def make_figures(df, sel, d_ref, d_nov, ood_auroc, bayes_ref, bayes_nov, seeds, 
     ax.set_xscale("log"); ax.set_ylim(0.5, 1.0)
     ax.set_xlabel("Training sample size (log)"); ax.set_ylabel("Sharpness (mean confidence)")
     ax.set_title("Similarly high confidence on novel cases"); ax.legend(frameon=False, fontsize=9)
+    ax.text(0.02, 0.97, "A", transform=ax.transAxes,
+            fontsize=13, fontweight="bold", va="top", ha="left",
+            bbox=dict(facecolor="white", edgecolor="none", alpha=0.85, pad=1.5))
     ax = axes[1]
     rng = default_rng(99); Xn, yn, _ = gen_regime(N_TEST, "novel", rng)
     Xf, yf, _ = gen_regime(max(SIZES), "reference", rng)
@@ -303,6 +348,9 @@ def make_figures(df, sel, d_ref, d_nov, ood_auroc, bayes_ref, bayes_nov, seeds, 
     ax.hist(g.predict_proba(Xn)[:, 1], bins=25, color=NOV_C, alpha=0.85)
     ax.set_xlabel("Predicted mortality probability (novel cases)"); ax.set_ylabel("Count")
     ax.set_title("Confident point estimates under regime shift")
+    ax.text(0.02, 0.97, "B", transform=ax.transAxes,
+            fontsize=13, fontweight="bold", va="top", ha="left",
+            bbox=dict(facecolor="white", edgecolor="none", alpha=0.85, pad=1.5))
     fig.tight_layout(); fig.savefig(f"{figdir}/figure3_pseudo_precision.png", bbox_inches="tight"); plt.close(fig)
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.4))
@@ -314,11 +362,17 @@ def make_figures(df, sel, d_ref, d_nov, ood_auroc, bayes_ref, bayes_nov, seeds, 
     ax.invert_xaxis(); ax.set_xlabel("Coverage (retained, high-confidence first)")
     ax.set_ylabel("Brier on retained cases"); ax.set_title("Confidence-based abstention only partly reduces error")
     ax.legend(frameon=False, fontsize=9)
+    ax.text(0.02, 0.97, "A", transform=ax.transAxes,
+            fontsize=13, fontweight="bold", va="top", ha="left",
+            bbox=dict(facecolor="white", edgecolor="none", alpha=0.85, pad=1.5))
     ax = axes[1]
     ax.hist(d_ref, bins=40, alpha=0.6, color=REF_C, label="Reference", density=True)
     ax.hist(d_nov, bins=40, alpha=0.6, color=NOV_C, label="Novel", density=True)
     ax.set_xlabel("Mahalanobis distance from reference"); ax.set_ylabel("Density")
     ax.set_title(f"Weak novelty detection (AUROC={ood_auroc:.2f})"); ax.legend(frameon=False, fontsize=9)
+    ax.text(0.02, 0.97, "B", transform=ax.transAxes,
+            fontsize=13, fontweight="bold", va="top", ha="left",
+            bbox=dict(facecolor="white", edgecolor="none", alpha=0.85, pad=1.5))
     fig.tight_layout(); fig.savefig(f"{figdir}/figure4_abstention_and_novelty.png", bbox_inches="tight"); plt.close(fig)
 
 
@@ -357,6 +411,8 @@ def main():
     a = anchors(args.seeds)
     sens = sensitivity(args.seeds)
     sens.to_csv(f"{out}/sensitivity.csv", index=False)
+    mix = mixed_accrual(args.seeds)
+    mix.to_csv(f"{out}/mixed_accrual.csv", index=False)
 
     # Mahalanobis distances for the novelty-detection figure (single reference fit)
     Xf, yf, _ = gen_regime(8000, "reference", default_rng(21))
@@ -403,13 +459,25 @@ def main():
     s3.to_csv(f"{tabs}/table_s3_sensitivity_analysis.csv")
     s3_mean = sens.groupby("scenario").mean(numeric_only=True).round(3)
     with open(f"{tabs}/table_s3_sensitivity_analysis.md", "w") as f:
-        f.write("| Scenario | Prevalence | Aleatoric floor | Model Brier | ECE | AUROC |\n")
-        f.write("|:--|--:|--:|--:|--:|--:|\n")
+        f.write("| Scenario | Prevalence | Aleatoric floor | Model Brier | ECE | AUROC | Novelty AUROC |\n")
+        f.write("|:--|--:|--:|--:|--:|--:|--:|\n")
         for scenario in ["main", "concept_shift_only_no_feature_shift", "prevalence_matched_novel"]:
             row = s3_mean.loc[scenario]
             f.write(
                 f"| {scenario} | {row.outcome_prevalence:.3f} | {row.bayes_brier:.3f} | "
-                f"{row.model_brier:.3f} | {row.ece:.3f} | {row.auroc:.3f} |\n"
+                f"{row.model_brier:.3f} | {row.ece:.3f} | {row.auroc:.3f} | {row.novelty_auroc:.3f} |\n"
+            )
+
+    mix_summary = mix.groupby(["novel_training_fraction", "novel_training_n"]).agg(["mean", "std"]).round(3)
+    mix_summary.to_csv(f"{tabs}/table_s4_mixed_accrual.csv")
+    mix_mean = mix.groupby(["novel_training_fraction", "novel_training_n"]).mean(numeric_only=True).round(3).reset_index()
+    with open(f"{tabs}/table_s4_mixed_accrual.md", "w") as f:
+        f.write("| Novel training fraction | Novel training n | Brier novel | ECE novel | AUROC novel |\n")
+        f.write("|--:|--:|--:|--:|--:|\n")
+        for _, row in mix_mean.iterrows():
+            f.write(
+                f"| {row.novel_training_fraction:.2f} | {int(row.novel_training_n)} | "
+                f"{row.brier:.3f} | {row.ece:.3f} | {row.auroc:.3f} |\n"
             )
 
     manifest = dict(
@@ -418,6 +486,7 @@ def main():
         mu_novel=MU_NOV.tolist(), intercept_ref=B0_REF, intercept_novel=B0_NOV,
         train_sizes=SIZES, test_size=N_TEST,
         novelty_detection_auroc=ood_auroc, **a,
+        sensitivity_novelty_auroc=s3_mean["novelty_auroc"].to_dict(),
         numpy=np.__version__, pandas=pd.__version__,
         python=sys.version.split()[0])
     with open(f"{out}/reproducibility_manifest.json", "w") as f:

@@ -40,12 +40,14 @@ laptop.
 | `outputs/selective_prediction_summary.csv` | mean/SD Brier on retained cases vs coverage |
 | `outputs/novelty_detection.csv` | per-seed Mahalanobis novelty-detection AUROC |
 | `outputs/sensitivity.csv` | per-seed sensitivity scenarios |
+| `outputs/mixed_accrual.csv` | per-seed mixed reference/novel accrual sensitivity |
 | `outputs/run_summary.md` | headline anchors (Bayes/oracle Brier, prevalences) |
 | `outputs/reproducibility_manifest.json` | parameters and environment |
 | `tables/table2_*.{csv,md}` | manuscript Table 2 (performance at n=8,000) |
 | `tables/table_s1_data_generating_parameters.md` | exact simulation parameters |
 | `tables/table_s2_uncertainty_type_comparison.md` | conceptual comparison table |
-| `tables/table_s3_sensitivity_analysis.{csv,md}` | prevalence/feature-shift checks |
+| `tables/table_s3_sensitivity_analysis.{csv,md}` | prevalence/feature-shift checks and novelty-detection AUROC |
+| `tables/table_s4_mixed_accrual.{csv,md}` | mixed reference/novel training sensitivity |
 | `figures/figure1_brier_by_training_size.png` | reducible vs irreducible error |
 | `figures/figure2_reliability_diagram.png` | calibration, both regimes |
 | `figures/figure3_pseudo_precision.png` | sharpness and predicted-probability spread |
@@ -62,6 +64,15 @@ the contributing causes of the main result:
 
 In all three variants the model's Brier score is far above the achievable
 (Bayes-optimal) floor for that variant.
+
+## Mixed-accrual sensitivity
+
+`tables/table_s4_mixed_accrual.md` reports an exploratory gradient-boosting
+sweep in which the total training size is fixed at 8,000 and the fraction of
+novel-regime cases in training varies from 0% to 20%. This quantifies the C3
+claim under partial representation: error on novel cases improves once the novel
+regime is represented, so the data-insensitive plateau is specific to reference-
+only or nearly absent novel-regime accrual.
 
 ## Interpretation and scope
 

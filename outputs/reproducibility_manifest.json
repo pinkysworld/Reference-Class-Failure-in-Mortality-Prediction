@@ -49,6 +49,11 @@
   "oracle_brier_novel": 0.09300600433643766,
   "reference_prevalence": 0.34908333333333336,
   "novel_prevalence": 0.7633166666666666,
+  "sensitivity_novelty_auroc": {
+    "concept_shift_only_no_feature_shift": 0.497,
+    "main": 0.568,
+    "prevalence_matched_novel": 0.566
+  },
   "numpy": "2.4.6",
   "pandas": "3.0.3",
   "python": "3.12.13"

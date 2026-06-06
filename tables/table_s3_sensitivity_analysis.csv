@@ -1,6 +1,6 @@
-,seed,seed,outcome_prevalence,outcome_prevalence,bayes_brier,bayes_brier,model_brier,model_brier,ece,ece,auroc,auroc
-,mean,std,mean,std,mean,std,mean,std,mean,std,mean,std
-scenario,,,,,,,,,,,,
-concept_shift_only_no_feature_shift,9.5,5.916,0.477,0.004,0.12,0.001,0.223,0.005,0.135,0.007,0.756,0.009
-main,9.5,5.916,0.762,0.006,0.092,0.001,0.219,0.007,0.228,0.009,0.766,0.013
-prevalence_matched_novel,9.5,5.916,0.349,0.007,0.111,0.001,0.229,0.005,0.186,0.01,0.757,0.011
+,seed,seed,outcome_prevalence,outcome_prevalence,bayes_brier,bayes_brier,model_brier,model_brier,ece,ece,auroc,auroc,novelty_auroc,novelty_auroc
+,mean,std,mean,std,mean,std,mean,std,mean,std,mean,std,mean,std
+scenario,,,,,,,,,,,,,,
+concept_shift_only_no_feature_shift,9.5,5.916,0.476,0.007,0.12,0.001,0.222,0.004,0.134,0.008,0.757,0.007,0.497,0.006
+main,9.5,5.916,0.765,0.005,0.092,0.001,0.219,0.007,0.23,0.01,0.768,0.011,0.568,0.006
+prevalence_matched_novel,9.5,5.916,0.351,0.005,0.11,0.001,0.228,0.004,0.182,0.009,0.757,0.011,0.566,0.007
